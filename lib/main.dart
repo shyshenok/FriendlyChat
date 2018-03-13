@@ -5,6 +5,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:async';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_database/ui/firebase_animated_list.dart';
+
+
 
 final googleSignIn = new GoogleSignIn();
 
@@ -46,6 +50,7 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   final List<ChatMessage> _messages = <ChatMessage>[];
   final TextEditingController _textController = new TextEditingController();
+  final reference = FirebaseDatabase.instance.reference().child('messages');
   final auth = FirebaseAuth.instance;
   final analytics = new FirebaseAnalytics();
   bool _isComposing = false;
@@ -139,6 +144,11 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   void _sendMessage({ String text }) {
+    reference.push().set({
+      "text" : text,
+      'senderName' : googleSignIn.currentUser.displayName,
+      'senderPhotoUrl': googleSignIn.currentUser.photoUrl,
+    });
     ChatMessage message = new ChatMessage(
       text: text,
       animationController: new AnimationController(
