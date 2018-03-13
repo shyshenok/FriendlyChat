@@ -8,10 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_database/ui/firebase_animated_list.dart';
 
-
-
-final googleSignIn = new GoogleSignIn();
-
 void main() {
   runApp(new FriendlychatApp());
 }
@@ -46,9 +42,8 @@ class ChatScreen extends StatefulWidget {
   State createState() => new ChatScreenState();
 }
 
-class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
-
-  final List<ChatMessage> _messages = <ChatMessage>[];
+class ChatScreenState extends State<ChatScreen> {
+  final googleSignIn = new GoogleSignIn();
   final TextEditingController _textController = new TextEditingController();
   final reference = FirebaseDatabase.instance.reference().child('messages');
   final auth = FirebaseAuth.instance;
@@ -65,36 +60,36 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             .of(context)
             .platform == TargetPlatform.iOS ? 0.0 : 4.0,
       ),
-      body: new Container(
-          child: new Column(
-              children: <Widget>[
-                new Flexible(
-                  child: new ListView.builder(
-                    padding: new EdgeInsets.all(8.0),
-                    reverse: true,
-                    itemBuilder: (_, int index) => _messages[index],
-                    itemCount: _messages.length,
+        body: new Container(
+            child: new Column(
+                children: <Widget>[
+                  new Flexible(
+                    child: new FirebaseAnimatedList(
+                      query: reference,
+                      sort: (a, b) => b.key.compareTo(a.key),
+                      padding: new EdgeInsets.all(8.0),
+                      reverse: true,
+                      itemBuilder: (_, DataSnapshot snapshot, Animation<double> animation, int x) {
+                        return new ChatMessage(
+                            snapshot: snapshot,
+                            animation: animation
+                        );
+                      },
+                    ),
                   ),
-                ),
-                new Divider(height: 1.0),
-                new Container(
-                  decoration: new BoxDecoration(
-                      color: Theme
-                          .of(context)
-                          .cardColor),
-                  child: _buildTextComposer(),
-                ),
-              ]
-          ),
-          decoration: Theme
-              .of(context)
-              .platform == TargetPlatform.iOS
-              ? new BoxDecoration(
-            border: new Border(
-              top: new BorderSide(color: Colors.grey[200]),
+                  new Divider(height: 1.0),
+                  new Container(
+                    decoration: new BoxDecoration(
+                        color: Theme.of(context).cardColor
+                    ),
+                    child: _buildTextComposer(),
+                  )
+                ]
             ),
-          )
-              : null),
+            decoration: Theme.of(context).platform ==TargetPlatform.iOS
+                ? new BoxDecoration(border: new Border(top: new BorderSide(color: Colors.grey[200])))
+          :null
+        )
     );
   }
 
@@ -145,21 +140,10 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   void _sendMessage({ String text }) {
     reference.push().set({
-      "text" : text,
-      'senderName' : googleSignIn.currentUser.displayName,
+      "text": text,
+      'senderName': googleSignIn.currentUser.displayName,
       'senderPhotoUrl': googleSignIn.currentUser.photoUrl,
     });
-    ChatMessage message = new ChatMessage(
-      text: text,
-      animationController: new AnimationController(
-        duration: new Duration(milliseconds: 700),
-        vsync: this,
-      ),
-    );
-    setState(() {
-      _messages.insert(0, message);
-    });
-    message.animationController.forward();
     analytics.logEvent(name: 'send_message');
   }
 
@@ -170,13 +154,6 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
     await _ensureLoggedIn();
     _sendMessage(text: text);
-  }
-
-  @override
-  void dispose() {
-    for (ChatMessage message in _messages)
-      message.animationController.dispose();
-    super.dispose();
   }
 
   Future<Null> _ensureLoggedIn() async {
@@ -199,16 +176,16 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 }
 
 class ChatMessage extends StatelessWidget {
-  ChatMessage({this.text, this.animationController});
+  ChatMessage({this.snapshot, this.animation});
 
-  final String text;
-  final AnimationController animationController;
+  final DataSnapshot snapshot;
+  final Animation animation;
 
   @override
   Widget build(BuildContext context) {
     return new SizeTransition(
       sizeFactor: new CurvedAnimation(
-          parent: animationController, curve: Curves.easeOut),
+          parent: animation, curve: Curves.easeOut),
       axisAlignment: 0.0,
       child: new Container(
         margin: const EdgeInsets.symmetric(vertical: 10.0),
@@ -219,20 +196,20 @@ class ChatMessage extends StatelessWidget {
               margin: const EdgeInsets.only(right: 16.0),
               child: new CircleAvatar(
                   backgroundImage:
-                  new NetworkImage(googleSignIn.currentUser.photoUrl)),
+                  new NetworkImage(snapshot.value['senderPhotoUrl'])),
             ),
             new Expanded(
               child: new Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  new Text(googleSignIn.currentUser.displayName,
+                  new Text(snapshot.value['senderName'],
                       style: Theme
                           .of(context)
                           .textTheme
                           .subhead),
                   new Container(
                     margin: const EdgeInsets.only(top: 5.0),
-                    child: new Text(text),
+                    child: new Text(snapshot.value['text']),
                   ),
                 ],
               ),
